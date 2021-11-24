@@ -8,7 +8,9 @@ from telegram.ext import CallbackQueryHandler, MessageHandler
 
 from constants import CLIENT_ID
 from fetch_moltin_data import (
+    add_product_to_cart,
     fetch_authorization_token,
+    fetch_cart,
     fetch_image_by_id,
     fetch_products,
     fetch_product_by_id,
@@ -74,7 +76,25 @@ def handle_menu(update, db):
         f'{product["description"]}'
     )
 
-    keyboard = [[InlineKeyboardButton('Назад', callback_data='Назад')]]
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                '1 кг',
+                callback_data=f"{product['id']};{product['name']};1",
+            ),
+            InlineKeyboardButton(
+                '5 кг',
+                callback_data=f"{product['id']};{product['name']};5",
+            ),
+            InlineKeyboardButton(
+                '10 кг',
+                callback_data=f"{product['id']};{product['name']};10",
+            ),
+        ],
+        [
+            InlineKeyboardButton('Назад', callback_data='Назад'),
+        ],
+    ]
 
     update.callback_query.message.bot.send_photo(
         chat_id,
@@ -87,21 +107,41 @@ def handle_menu(update, db):
 
 
 def handle_description(update, db):
+    request = update.callback_query.data
     chat_id = update.callback_query.message.chat_id
-
     token = db.get(f'{chat_id}_auth_token').decode()
-    products = fetch_products(token)
 
-    keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])]
-        for product in products['data']
-    ]
+    if request == 'Назад':
+        update.callback_query.message.bot.delete_message(
+            chat_id,
+            message_id=update.callback_query.message.message_id,
+        )
 
-    update.callback_query.message.reply_text(
-        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+        products = fetch_products(token)
 
-    return 'HANDLE_MENU'
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    product['name'], callback_data=product['id']
+                )
+            ]
+            for product in products['data']
+        ]
+
+        update.callback_query.message.reply_text(
+            'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+        return 'HANDLE_MENU'
+    else:
+        product_id, product_name, quantity = request.split(';')
+        add_product_to_cart(token, product_id, int(quantity), chat_id)
+
+        update.callback_query.message.reply_text(
+            f'{quantity} товаров {product_name} добавлено в корзину'
+        )
+
+        return 'HANDLE_DESCRIPTION'
 
 
 def handle_request(update, context, db):
