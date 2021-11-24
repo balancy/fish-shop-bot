@@ -31,7 +31,7 @@ def start(update, db):
     ]
 
     update.message.reply_text(
-        'Please choose:', reply_markup=InlineKeyboardMarkup(keyboard)
+        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
     return 'HANDLE_MENU'
@@ -70,17 +70,38 @@ def handle_menu(update, db):
     caption = (
         f'{product["name"]}\n\n'
         f'{product["meta"]["display_price"]["with_tax"]["formatted"]} per kg\n\n'
-        f'{product["meta"]["stock"]["level"]}kg in stock\n\n'
+        f'{product["meta"]["stock"]["level"]} kg in stock\n\n'
         f'{product["description"]}'
     )
+
+    keyboard = [[InlineKeyboardButton('Назад', callback_data='Назад')]]
 
     update.callback_query.message.bot.send_photo(
         chat_id,
         image_url,
         caption=caption,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
-    return 'START'
+    return 'HANDLE_DESCRIPTION'
+
+
+def handle_description(update, db):
+    chat_id = update.callback_query.message.chat_id
+
+    token = db.get(f'{chat_id}_auth_token').decode()
+    products = fetch_products(token)
+
+    keyboard = [
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])]
+        for product in products['data']
+    ]
+
+    update.callback_query.message.reply_text(
+        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    return 'HANDLE_MENU'
 
 
 def handle_request(update, context, db):
@@ -113,6 +134,7 @@ def handle_request(update, context, db):
         'START': start,
         'ECHO': echo,
         'HANDLE_MENU': handle_menu,
+        'HANDLE_DESCRIPTION': handle_description,
     }
     state_handler = state_functions[user_state]
 
