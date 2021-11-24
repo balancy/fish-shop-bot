@@ -10,11 +10,60 @@ from constants import CLIENT_ID
 from fetch_moltin_data import (
     add_product_to_cart,
     fetch_authorization_token,
-    fetch_cart,
     fetch_image_by_id,
     fetch_products,
     fetch_product_by_id,
 )
+
+
+def send_products_to_chat(products, chat):
+    keyboard = [
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])]
+        for product in products['data']
+    ]
+
+    chat.reply_text(
+        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+def send_product_details_to_chat(product, chat, auth_token):
+    product_image_id = product['relationships']['main_image']['data']['id']
+    product_image = fetch_image_by_id(auth_token, product_image_id)['data']
+    product_image_url = product_image['link']['href']
+
+    product_id = product['id']
+    product_name = product['name']
+    product_price = product['meta']['display_price']['with_tax']['formatted']
+    available_product_quantity = product['meta']['stock']['level']
+    product_description = product['description']
+
+    caption = (
+        f'{product_name}\n\n'
+        f'{product_price} per kg\n\n'
+        f'{available_product_quantity} kg in stock\n\n'
+        f'{product_description}'
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                f'{quantity} кг',
+                callback_data=f'{product_id};{product_name};{quantity}',
+            )
+            for quantity in [1, 5, 10]
+        ],
+        [
+            InlineKeyboardButton('Назад', callback_data='Назад'),
+        ],
+    ]
+
+    chat.bot.send_photo(
+        chat.chat_id,
+        product_image_url,
+        caption=caption,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
 
 def start(update, db):
@@ -22,120 +71,55 @@ def start(update, db):
     Хэндлер для состояния START.
     """
 
-    token = fetch_authorization_token(CLIENT_ID)
-    db.set(f'{update.message.chat_id}_auth_token', token)
+    auth_token = fetch_authorization_token(CLIENT_ID)
+    db.set(f'{update.message.chat_id}_auth_token', auth_token)
 
-    products = fetch_products(token)
-
-    keyboard = [
-        [InlineKeyboardButton(product['name'], callback_data=product['id'])]
-        for product in products['data']
-    ]
-
-    update.message.reply_text(
-        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    products = fetch_products(auth_token)
+    send_products_to_chat(products, update.message)
 
     return 'HANDLE_MENU'
 
 
-def echo(update, db):
-    """
-    Хэндлер для состояния ECHO.
-    """
-
-    update.message.reply_text(update.message.text)
-
-    return 'ECHO'
-
-
 def handle_menu(update, db):
-    """
-    Хэндлер для состояния HANDLE_MENU.
-    """
-
-    product_id = update.callback_query.data
-    chat_id = update.callback_query.message.chat_id
+    request = update.callback_query.data
+    chat = update.callback_query.message
 
     update.callback_query.message.bot.delete_message(
-        chat_id,
+        chat.chat_id,
         message_id=update.callback_query.message.message_id,
     )
 
-    token = db.get(f'{chat_id}_auth_token').decode()
-    product = fetch_product_by_id(token, product_id)['data']
+    token = db.get(f'{chat.chat_id}_auth_token').decode()
+    product = fetch_product_by_id(token, request)['data']
 
-    image_id = product['relationships']['main_image']['data']['id']
-    image = fetch_image_by_id(token, image_id)['data']
-    image_url = image['link']['href']
-
-    caption = (
-        f'{product["name"]}\n\n'
-        f'{product["meta"]["display_price"]["with_tax"]["formatted"]} per kg\n\n'
-        f'{product["meta"]["stock"]["level"]} kg in stock\n\n'
-        f'{product["description"]}'
-    )
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                '1 кг',
-                callback_data=f"{product['id']};{product['name']};1",
-            ),
-            InlineKeyboardButton(
-                '5 кг',
-                callback_data=f"{product['id']};{product['name']};5",
-            ),
-            InlineKeyboardButton(
-                '10 кг',
-                callback_data=f"{product['id']};{product['name']};10",
-            ),
-        ],
-        [
-            InlineKeyboardButton('Назад', callback_data='Назад'),
-        ],
-    ]
-
-    update.callback_query.message.bot.send_photo(
-        chat_id,
-        image_url,
-        caption=caption,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    send_product_details_to_chat(product, chat, token)
 
     return 'HANDLE_DESCRIPTION'
 
 
 def handle_description(update, db):
     request = update.callback_query.data
-    chat_id = update.callback_query.message.chat_id
-    token = db.get(f'{chat_id}_auth_token').decode()
+    chat = update.callback_query.message
+    auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
     if request == 'Назад':
         update.callback_query.message.bot.delete_message(
-            chat_id,
+            chat.chat_id,
             message_id=update.callback_query.message.message_id,
         )
 
-        products = fetch_products(token)
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    product['name'], callback_data=product['id']
-                )
-            ]
-            for product in products['data']
-        ]
-
-        update.callback_query.message.reply_text(
-            'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        products = fetch_products(auth_token)
+        send_products_to_chat(products, update.callback_query.message)
 
         return 'HANDLE_MENU'
     else:
         product_id, product_name, quantity = request.split(';')
-        add_product_to_cart(token, product_id, int(quantity), chat_id)
+        add_product_to_cart(
+            auth_token,
+            product_id,
+            int(quantity),
+            chat.chat_id,
+        )
 
         update.callback_query.message.reply_text(
             f'{quantity} товаров {product_name} добавлено в корзину'
@@ -172,7 +156,6 @@ def handle_request(update, context, db):
 
     state_functions = {
         'START': start,
-        'ECHO': echo,
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
     }

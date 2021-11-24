@@ -59,7 +59,6 @@ def add_product_to_cart(token, product_id, quantity, cart_name):
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json',
     }
-    print(headers)
 
     data = {
         'data': {
@@ -68,8 +67,6 @@ def add_product_to_cart(token, product_id, quantity, cart_name):
             'quantity': quantity,
         }
     }
-
-    print(data)
 
     response = requests.post(
         f'https://api.moltin.com/v2/carts/{cart_name}/items',
