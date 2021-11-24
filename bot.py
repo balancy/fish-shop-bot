@@ -2,7 +2,7 @@ from functools import partial
 
 from environs import Env
 from redis import Redis
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, replymarkup
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, MessageHandler
 
@@ -10,6 +10,7 @@ from constants import CLIENT_ID
 from fetch_moltin_data import (
     add_product_to_cart,
     fetch_authorization_token,
+    fetch_cart_items,
     fetch_image_by_id,
     fetch_products,
     fetch_product_by_id,
@@ -21,10 +22,9 @@ def send_products_to_chat(products, chat):
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
     ]
+    keyboard.append([InlineKeyboardButton('Cart', callback_data='Cart')])
 
-    chat.reply_text(
-        'Товары в каталоге:', reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    chat.reply_text('Catalog', reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def send_product_details_to_chat(product, chat, auth_token):
@@ -39,10 +39,8 @@ def send_product_details_to_chat(product, chat, auth_token):
     product_description = product['description']
 
     caption = (
-        f'{product_name}\n\n'
-        f'{product_price} per kg\n\n'
-        f'{available_product_quantity} kg in stock\n\n'
-        f'{product_description}'
+        f'{product_name}\n\n{product_price} per kg\n\n'
+        f'{available_product_quantity} kg in stock\n\n {product_description}'
     )
 
     keyboard = [
@@ -54,7 +52,8 @@ def send_product_details_to_chat(product, chat, auth_token):
             for quantity in [1, 5, 10]
         ],
         [
-            InlineKeyboardButton('Назад', callback_data='Назад'),
+            InlineKeyboardButton('Back', callback_data='Back'),
+            InlineKeyboardButton('Cart', callback_data='Cart'),
         ],
     ]
 
@@ -64,6 +63,29 @@ def send_product_details_to_chat(product, chat, auth_token):
         caption=caption,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
+
+
+def send_cart_to_chat(cart, chat):
+    bot_reply = ''
+    for cart_item in cart['data']:
+        item_name = cart_item['name']
+        price_with_tax = cart_item['meta']['display_price']['with_tax']
+        unit_price = price_with_tax['unit']['formatted']
+        position_price = price_with_tax['value']['formatted']
+
+        quantity = cart_item['quantity']
+        bot_reply += (
+            f'{item_name}\n{unit_price} per kg\n{quantity} kg in cart for '
+            f'{position_price}\n\n'
+        )
+    total_price = cart['meta']['display_price']['with_tax']
+    bot_reply += 'Total: ' + total_price['formatted']
+
+    keyboard = [
+        [InlineKeyboardButton('Back to menu', callback_data='Back to menu')]
+    ]
+
+    chat.reply_text(bot_reply, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def start(update, db):
@@ -83,18 +105,20 @@ def start(update, db):
 def handle_menu(update, db):
     request = update.callback_query.data
     chat = update.callback_query.message
+    auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
-    update.callback_query.message.bot.delete_message(
-        chat.chat_id,
-        message_id=update.callback_query.message.message_id,
-    )
+    chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
-    token = db.get(f'{chat.chat_id}_auth_token').decode()
-    product = fetch_product_by_id(token, request)['data']
+    if request == 'Cart':
+        cart = fetch_cart_items(auth_token, chat.chat_id)
+        send_cart_to_chat(cart, chat)
 
-    send_product_details_to_chat(product, chat, token)
+        return 'HANDLE_CART'
+    else:
+        product = fetch_product_by_id(auth_token, request)['data']
+        send_product_details_to_chat(product, chat, auth_token)
 
-    return 'HANDLE_DESCRIPTION'
+        return 'HANDLE_DESCRIPTION'
 
 
 def handle_description(update, db):
@@ -102,16 +126,20 @@ def handle_description(update, db):
     chat = update.callback_query.message
     auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
-    if request == 'Назад':
-        update.callback_query.message.bot.delete_message(
-            chat.chat_id,
-            message_id=update.callback_query.message.message_id,
-        )
+    if request == 'Back':
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
         products = fetch_products(auth_token)
         send_products_to_chat(products, update.callback_query.message)
 
         return 'HANDLE_MENU'
+    elif request == 'Cart':
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+
+        cart = fetch_cart_items(auth_token, chat.chat_id)
+        send_cart_to_chat(cart, chat)
+
+        return 'HANDLE_CART'
     else:
         product_id, product_name, quantity = request.split(';')
         add_product_to_cart(
@@ -121,11 +149,22 @@ def handle_description(update, db):
             chat.chat_id,
         )
 
-        update.callback_query.message.reply_text(
+        chat.reply_text(
             f'{quantity} товаров {product_name} добавлено в корзину'
         )
 
         return 'HANDLE_DESCRIPTION'
+
+
+def handle_cart(update, db):
+    request = update.callback_query.data
+    chat = update.callback_query.message
+    auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
+
+    if request == 'Back to menu':
+        chat.reply_text('Переход в меню')
+
+        return 'HANDLE_MENU'
 
 
 def handle_request(update, context, db):
@@ -158,6 +197,7 @@ def handle_request(update, context, db):
         'START': start,
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
+        'HANDLE_CART': handle_cart,
     }
     state_handler = state_functions[user_state]
 
