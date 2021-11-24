@@ -1,18 +1,14 @@
 from functools import partial
+from inspect import signature
 
 from environs import Env
 from redis import Redis
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Filters, Updater
-from telegram.ext import (
-    CallbackQueryHandler,
-    CommandHandler,
-    ConversationHandler,
-    MessageHandler,
-)
+from telegram.ext import MessageHandler
 
 
-def start(update, context, db):
+def start(update, context):
     """
     Хэндлер для состояния START.
 
@@ -20,12 +16,14 @@ def start(update, context, db):
     Теперь в ответ на его команды будет запускаеться хэндлер echo.
     """
 
-    update.message.reply_text(text='Привет!')
+    keyboard = ReplyKeyboardMarkup([['Option 1', 'Option 2'], ['Option 3']])
+
+    update.message.reply_text('Please choose:', reply_markup=keyboard)
 
     return "ECHO"
 
 
-def echo(update, context, db):
+def echo(update, context):
     """
     Хэндлер для состояния ECHO.
 
@@ -33,8 +31,7 @@ def echo(update, context, db):
     Оставляет пользователя в состоянии ECHO.
     """
 
-    users_reply = update.message.text
-    update.message.reply_text(users_reply)
+    update.message.reply_text(update.message.text)
 
     return "ECHO"
 
@@ -65,12 +62,16 @@ def handle_request(update, context, db):
         user_state = 'START'
     else:
         user_state = db.get(chat_id).decode("utf-8")
-        print(f'{user_state=}')
 
     state_functions = {'START': start, 'ECHO': echo}
     state_handler = state_functions[user_state]
 
-    next_state = state_handler(update, context, db)
+    params_number = len(signature(state_handler).parameters)
+    if params_number == 3:
+        next_state = state_handler(update, context, db)
+    else:
+        next_state = state_handler(update, context)
+
     db.set(chat_id, next_state)
 
 
@@ -95,6 +96,4 @@ if __name__ == '__main__':
     dp.add_handler(
         MessageHandler(Filters.text, partial(handle_request, db=db))
     )
-    # dp.add_handler(CallbackQueryHandler(partial(handle_users_reply, db=db)))
-    # dp.add_handler(CommandHandler('start', handle_users_reply))
     updater.start_polling()
