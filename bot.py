@@ -9,6 +9,7 @@ from telegram.ext import CallbackQueryHandler, MessageHandler
 from constants import CLIENT_ID
 from fetch_moltin_data import (
     fetch_authorization_token,
+    fetch_image_by_id,
     fetch_products,
     fetch_product_by_id,
 )
@@ -54,17 +55,30 @@ def handle_menu(update, db):
     product_id = update.callback_query.data
     chat_id = update.callback_query.message.chat_id
 
+    update.callback_query.message.bot.delete_message(
+        chat_id,
+        message_id=update.callback_query.message.message_id,
+    )
+
     token = db.get(f'{chat_id}_auth_token').decode()
     product = fetch_product_by_id(token, product_id)['data']
 
-    message = (
+    image_id = product['relationships']['main_image']['data']['id']
+    image = fetch_image_by_id(token, image_id)['data']
+    image_url = image['link']['href']
+
+    caption = (
         f'{product["name"]}\n\n'
         f'{product["meta"]["display_price"]["with_tax"]["formatted"]} per kg\n\n'
         f'{product["meta"]["stock"]["level"]}kg in stock\n\n'
         f'{product["description"]}'
     )
 
-    update.callback_query.message.reply_text(message)
+    update.callback_query.message.bot.send_photo(
+        chat_id,
+        image_url,
+        caption=caption,
+    )
 
     return 'START'
 
