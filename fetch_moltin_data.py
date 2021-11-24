@@ -54,7 +54,7 @@ def fetch_image_by_id(token, image_id):
     return response.json()
 
 
-def add_product_to_cart(token, product_id, quantity, cart_name):
+def add_product_to_cart(token, cart_name, product_id, quantity):
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json',
@@ -95,6 +95,18 @@ def fetch_cart_items(token, cart_name):
 
     response = requests.get(
         f'https://api.moltin.com/v2/carts/{cart_name}/items', headers=headers
+    )
+    response.raise_for_status()
+
+    return response.json()
+
+
+def remove_cart_item_by_id(token, cart_name, item_id):
+    headers = {'Authorization': f'Bearer {token}'}
+
+    response = requests.delete(
+        f'https://api.moltin.com/v2/carts/{cart_name}/items/{item_id}',
+        headers=headers,
     )
     response.raise_for_status()
 
