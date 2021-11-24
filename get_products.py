@@ -1,4 +1,5 @@
 import argparse
+import json
 
 import requests
 
@@ -16,15 +17,15 @@ def fetch_products(token):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description="Get list of products using given Bearer token"
+        description='Get list of products using given Bearer token'
     )
     parser.add_argument(
-        "-t",
-        "--token",
+        '-t',
+        '--token',
         type=str,
-        help="bearer token",
+        help='bearer token',
     )
     args = parser.parse_args()
 
     products = fetch_products(args.token)
-    print(products)
+    print(json.dumps(products, indent=2))
