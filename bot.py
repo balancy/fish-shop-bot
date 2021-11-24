@@ -1,29 +1,36 @@
 from functools import partial
-from inspect import signature
 
 from environs import Env
 from redis import Redis
-from telegram import ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Filters, Updater
-from telegram.ext import MessageHandler
+from telegram.ext import CallbackQueryHandler, MessageHandler
+
+from constants import CLIENT_ID
+from fetch_moltin_data import fetch_authorization_token, fetch_products
 
 
-def start(update, context):
+def start(update, context, db):
     """
     Хэндлер для состояния START.
-
-    Бот отвечает пользователю фразой "Привет!" и переводит его в состояние ECHO.
-    Теперь в ответ на его команды будет запускаеться хэндлер echo.
     """
 
-    keyboard = ReplyKeyboardMarkup([['Option 1', 'Option 2'], ['Option 3']])
+    token = fetch_authorization_token(CLIENT_ID)
+    products = fetch_products(token)
 
-    update.message.reply_text('Please choose:', reply_markup=keyboard)
+    keyboard = [
+        [InlineKeyboardButton(product['name'], callback_data=product['id'])]
+        for product in products['data']
+    ]
+
+    update.message.reply_text(
+        'Please choose:', reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
     return "ECHO"
 
 
-def echo(update, context):
+def echo(update, context, db):
     """
     Хэндлер для состояния ECHO.
 
@@ -51,6 +58,7 @@ def handle_request(update, context, db):
     """
 
     if update.message:
+        print('--------------- message --------------')
         request = update.message.text
         chat_id = update.message.chat_id
     elif update.callback_query:
@@ -66,11 +74,7 @@ def handle_request(update, context, db):
     state_functions = {'START': start, 'ECHO': echo}
     state_handler = state_functions[user_state]
 
-    params_number = len(signature(state_handler).parameters)
-    if params_number == 3:
-        next_state = state_handler(update, context, db)
-    else:
-        next_state = state_handler(update, context)
+    next_state = state_handler(update, context, db)
 
     db.set(chat_id, next_state)
 
@@ -96,4 +100,5 @@ if __name__ == '__main__':
     dp.add_handler(
         MessageHandler(Filters.text, partial(handle_request, db=db))
     )
+    dp.add_handler(CallbackQueryHandler(partial(handle_request, db=db)))
     updater.start_polling()
