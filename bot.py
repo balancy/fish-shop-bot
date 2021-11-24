@@ -7,15 +7,21 @@ from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, MessageHandler
 
 from constants import CLIENT_ID
-from fetch_moltin_data import fetch_authorization_token, fetch_products
+from fetch_moltin_data import (
+    fetch_authorization_token,
+    fetch_products,
+    fetch_product_by_id,
+)
 
 
-def start(update, context, db):
+def start(update, db):
     """
     Хэндлер для состояния START.
     """
 
     token = fetch_authorization_token(CLIENT_ID)
+    db.set(f'{update.message.chat_id}_auth_token', token)
+
     products = fetch_products(token)
 
     keyboard = [
@@ -27,20 +33,40 @@ def start(update, context, db):
         'Please choose:', reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    return "ECHO"
+    return 'HANDLE_MENU'
 
 
-def echo(update, context, db):
+def echo(update, db):
     """
     Хэндлер для состояния ECHO.
-
-    Бот отвечает пользователю тем же, что пользователь ему написал.
-    Оставляет пользователя в состоянии ECHO.
     """
 
     update.message.reply_text(update.message.text)
 
-    return "ECHO"
+    return 'ECHO'
+
+
+def handle_menu(update, db):
+    """
+    Хэндлер для состояния HANDLE_MENU.
+    """
+
+    product_id = update.callback_query.data
+    chat_id = update.callback_query.message.chat_id
+
+    token = db.get(f'{chat_id}_auth_token').decode()
+    product = fetch_product_by_id(token, product_id)['data']
+
+    message = (
+        f'{product["name"]}\n\n'
+        f'{product["meta"]["display_price"]["with_tax"]["formatted"]} per kg\n\n'
+        f'{product["meta"]["stock"]["level"]}kg in stock\n\n'
+        f'{product["description"]}'
+    )
+
+    update.callback_query.message.reply_text(message)
+
+    return 'START'
 
 
 def handle_request(update, context, db):
@@ -58,11 +84,9 @@ def handle_request(update, context, db):
     """
 
     if update.message:
-        print('--------------- message --------------')
         request = update.message.text
         chat_id = update.message.chat_id
     elif update.callback_query:
-        print('--------------- callback --------------')
         request = update.callback_query.data
         chat_id = update.callback_query.message.chat_id
 
@@ -71,10 +95,14 @@ def handle_request(update, context, db):
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
-    state_functions = {'START': start, 'ECHO': echo}
+    state_functions = {
+        'START': start,
+        'ECHO': echo,
+        'HANDLE_MENU': handle_menu,
+    }
     state_handler = state_functions[user_state]
 
-    next_state = state_handler(update, context, db)
+    next_state = state_handler(update, db)
 
     db.set(chat_id, next_state)
 
