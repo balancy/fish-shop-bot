@@ -70,18 +70,21 @@ def send_product_details_interface_to_chat(product, chat, auth_token):
 def send_cart_interface_to_chat(cart, chat):
     bot_reply = ''.join(
         f"{cart_item['name']}\n"
-        f"{cart_item['meta']['display_price']['with_tax']['unit']['formatted']}"
-        f" per kg\n{cart_item['quantity']} kg in cart for "
-        f"{cart_item['meta']['display_price']['with_tax']['value']['formatted']}"
-        "\n\n"
+        f"{cart_item['meta']['display_price']['with_tax']['unit']['formatted']} per kg\n"
+        f"{cart_item['quantity']} kg in cart for "
+        f"{cart_item['meta']['display_price']['with_tax']['value']['formatted']}\n\n"
         for cart_item in cart['data']
     )
 
     if not bot_reply:
         bot_reply = 'Your cart is empty'
     else:
-        bot_reply += (
-            f"Total: {cart['meta']['display_price']['with_tax']['formatted']}"
+        bot_reply = (
+            "Your cart:\n\n"
+            + bot_reply
+            + (
+                f"Total: {cart['meta']['display_price']['with_tax']['formatted']}"
+            )
         )
 
     keyboard = [
@@ -90,13 +93,16 @@ def send_cart_interface_to_chat(cart, chat):
                 f'Remove {cart_item["name"]} from Cart',
                 callback_data=f'{cart_item["id"]}',
             )
-            for cart_item in cart['data']
-        ],
-        [InlineKeyboardButton('Back to menu', callback_data='Back to menu')],
+        ]
+        for cart_item in cart['data']
     ]
+    keyboard.append([InlineKeyboardButton('Pay', callback_data='Pay')])
+    keyboard.append(
+        [InlineKeyboardButton('Back to menu', callback_data='Back to menu')]
+    )
 
     chat.reply_text(
-        f'Your cart:\n\n{bot_reply}',
+        bot_reply,
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -181,6 +187,25 @@ def handle_cart(update, db):
         )
 
         return 'HANDLE_MENU'
+    if request == 'Pay':
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+
+        bot_reply = 'Enter your email'
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    'Back to cart',
+                    callback_data='Back to cart',
+                )
+            ],
+        ]
+
+        chat.reply_text(
+            bot_reply,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+        return 'WAITING_EMAIL'
     else:
         chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
@@ -192,6 +217,27 @@ def handle_cart(update, db):
         send_cart_interface_to_chat(cart, chat)
 
         return 'HANDLE_CART'
+
+
+def wait_email(update, db):
+    if update.message:
+        request = update.message.text
+        chat = update.message
+    elif update.callback_query:
+        request = update.callback_query.data
+        chat = update.callback_query.message
+
+    auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
+
+    if request == 'Back to cart':
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+
+        cart = fetch_cart_items(auth_token, chat.chat_id)
+        send_cart_interface_to_chat(cart, chat)
+
+        return 'HANDLE_CART'
+    else:
+        chat.reply_text(f'You sent me an email: {request}')
 
 
 def handle_request(update, context, db):
@@ -225,6 +271,7 @@ def handle_request(update, context, db):
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
+        'WAITING_EMAIL': wait_email,
     }
     state_handler = state_functions[user_state]
 
