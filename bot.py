@@ -10,12 +10,15 @@ from telegram.ext import CallbackQueryHandler, MessageHandler
 from constants import CLIENT_ID
 from fetch_moltin_data import (
     add_product_to_cart,
+    create_customer,
     fetch_authorization_token,
     fetch_cart_items,
     fetch_image_by_id,
     fetch_products,
     fetch_product_by_id,
     remove_cart_item_by_id,
+    InvalidEmail,
+    UserExistsError,
 )
 
 
@@ -41,8 +44,10 @@ def send_product_details_interface_to_chat(product, chat, auth_token):
     product_description = product['description']
 
     caption = (
-        f'{product_name}\n\n{product_price} per kg\n\n'
-        f'{available_product_quantity} kg in stock\n\n {product_description}'
+        f'{product_name}\n\n'
+        f'{product_price} per kg\n\n'
+        f'{available_product_quantity} kg in stock\n\n'
+        f'{product_description}'
     )
 
     keyboard = [
@@ -54,7 +59,7 @@ def send_product_details_interface_to_chat(product, chat, auth_token):
             for quantity in [1, 5, 10]
         ],
         [
-            InlineKeyboardButton('Back', callback_data='Back'),
+            InlineKeyboardButton('Back to menu', callback_data='Back to menu'),
             InlineKeyboardButton('Cart', callback_data='Cart'),
         ],
     ]
@@ -67,25 +72,30 @@ def send_product_details_interface_to_chat(product, chat, auth_token):
     )
 
 
+def format_cart_item_for_display(cart_item):
+    name = cart_item['name']
+    formatted_price = cart_item['meta']['display_price']['with_tax']
+    unit_price = formatted_price['unit']['formatted']
+    position_price = formatted_price['value']['formatted']
+    quantity = cart_item['quantity']
+
+    return (
+        f'{name}\n'
+        f'{unit_price} per kg\n'
+        f'{quantity} kg in cart for {position_price}\n\n'
+    )
+
+
 def send_cart_interface_to_chat(cart, chat):
     bot_reply = ''.join(
-        f"{cart_item['name']}\n"
-        f"{cart_item['meta']['display_price']['with_tax']['unit']['formatted']} per kg\n"
-        f"{cart_item['quantity']} kg in cart for "
-        f"{cart_item['meta']['display_price']['with_tax']['value']['formatted']}\n\n"
-        for cart_item in cart['data']
+        format_cart_item_for_display(cart_item) for cart_item in cart['data']
     )
 
     if not bot_reply:
         bot_reply = 'Your cart is empty'
     else:
-        bot_reply = (
-            "Your cart:\n\n"
-            + bot_reply
-            + (
-                f"Total: {cart['meta']['display_price']['with_tax']['formatted']}"
-            )
-        )
+        total_amount = cart['meta']['display_price']['with_tax']['formatted']
+        bot_reply = f'Your cart:\n\n{bot_reply}Total: {total_amount}'
 
     keyboard = [
         [
@@ -108,59 +118,63 @@ def send_cart_interface_to_chat(cart, chat):
 
 
 def start(update, db):
-    """
-    Хэндлер для состояния START.
-    """
+    chat = update.message
 
-    auth_token = fetch_authorization_token(CLIENT_ID)
-    db.set(f'{update.message.chat_id}_auth_token', auth_token)
+    auth_token = fetch_authorization_token(CLIENT_ID)['access_token']
+    db.set(f'{chat.chat_id}_auth_token', auth_token)
 
     products = fetch_products(auth_token)
-    send_products_interface_to_chat(products, update.message)
+    send_products_interface_to_chat(products, chat)
 
     return 'HANDLE_MENU'
 
 
 def handle_menu(update, db):
-    request = update.callback_query.data
+    if chat := update.message:
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+        return 'HANDLE_MENU'
+
+    query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
-    if request == 'Cart':
+    if query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
         send_cart_interface_to_chat(cart, chat)
 
         return 'HANDLE_CART'
     else:
-        product = fetch_product_by_id(auth_token, request)['data']
+        product = fetch_product_by_id(auth_token, query)['data']
         send_product_details_interface_to_chat(product, chat, auth_token)
 
         return 'HANDLE_DESCRIPTION'
 
 
 def handle_description(update, db):
-    request = update.callback_query.data
+    if chat := update.message:
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+        return 'HANDLE_MENU'
+
+    query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
-    if request == 'Back':
+    if query == 'Back to menu':
         products = fetch_products(auth_token)
-        send_products_interface_to_chat(
-            products, update.callback_query.message
-        )
+        send_products_interface_to_chat(products, chat)
 
         return 'HANDLE_MENU'
-    elif request == 'Cart':
+    elif query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
         send_cart_interface_to_chat(cart, chat)
 
         return 'HANDLE_CART'
     else:
-        product_id, quantity = request.split(';')
+        product_id, quantity = query.split(';')
         cart = add_product_to_cart(
             auth_token,
             chat.chat_id,
@@ -174,45 +188,30 @@ def handle_description(update, db):
 
 
 def handle_cart(update, db):
-    request = update.callback_query.data
+    if chat := update.message:
+        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+        return 'HANDLE_MENU'
+
+    query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
-    if request == 'Back to menu':
-        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+    chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
+    if query == 'Back to menu':
         products = fetch_products(auth_token)
-        send_products_interface_to_chat(
-            products, update.callback_query.message
-        )
+        send_products_interface_to_chat(products, chat)
 
         return 'HANDLE_MENU'
-    if request == 'Pay':
-        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
-
-        bot_reply = 'Enter your email'
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    'Back to cart',
-                    callback_data='Back to cart',
-                )
-            ],
-        ]
-
-        chat.reply_text(
-            bot_reply,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+    if query == 'Pay':
+        chat.reply_text('Enter your email:')
 
         return 'WAITING_EMAIL'
     else:
-        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
-
         cart = remove_cart_item_by_id(
             auth_token,
             chat.chat_id,
-            request,
+            query,
         )
         send_cart_interface_to_chat(cart, chat)
 
@@ -220,24 +219,28 @@ def handle_cart(update, db):
 
 
 def wait_email(update, db):
-    if update.message:
-        request = update.message.text
-        chat = update.message
-    elif update.callback_query:
-        request = update.callback_query.data
-        chat = update.callback_query.message
-
+    query = update.message.text
+    chat = update.message
     auth_token = db.get(f'{chat.chat_id}_auth_token').decode()
 
-    if request == 'Back to cart':
-        chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
+    chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
-        cart = fetch_cart_items(auth_token, chat.chat_id)
-        send_cart_interface_to_chat(cart, chat)
-
-        return 'HANDLE_CART'
+    try:
+        create_customer(token=auth_token, email=query)
+    except InvalidEmail:
+        bot_reply = f'Email {query} is incorrect.\nEnter your email:'
+    except UserExistsError:
+        bot_reply = f'User with email {query} exists already.'
     else:
-        chat.reply_text(f'You sent me an email: {request}')
+        bot_reply = f'User with email {query} added to the DB.'
+
+    chat.reply_text(bot_reply)
+
+    return 'IDLE'
+
+
+def idle(update, db):
+    return None
 
 
 def handle_request(update, context, db):
@@ -256,15 +259,15 @@ def handle_request(update, context, db):
 
     if update.message:
         request = update.message.text
-        chat_id = update.message.chat_id
+        chat = update.message
     elif update.callback_query:
         request = update.callback_query.data
-        chat_id = update.callback_query.message.chat_id
+        chat = update.callback_query.message
 
     if request == '/start':
         user_state = 'START'
     else:
-        user_state = db.get(chat_id).decode("utf-8")
+        user_state = db.get(chat.chat_id).decode("utf-8")
 
     state_functions = {
         'START': start,
@@ -272,12 +275,13 @@ def handle_request(update, context, db):
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
         'WAITING_EMAIL': wait_email,
+        'IDLE': idle,
     }
     state_handler = state_functions[user_state]
 
     next_state = state_handler(update, db)
 
-    db.set(chat_id, next_state)
+    db.set(chat.chat_id, next_state)
 
 
 if __name__ == '__main__':

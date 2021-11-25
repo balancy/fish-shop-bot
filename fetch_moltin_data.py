@@ -1,6 +1,15 @@
 import json
 
 import requests
+from requests.models import HTTPError
+
+
+class UserExistsError(HTTPError):
+    pass
+
+
+class InvalidEmail(HTTPError):
+    pass
 
 
 def fetch_authorization_token(client_id):
@@ -15,7 +24,7 @@ def fetch_authorization_token(client_id):
     )
     response.raise_for_status()
 
-    return response.json()['access_token']
+    return response.json()
 
 
 def fetch_products(token):
@@ -108,6 +117,38 @@ def remove_cart_item_by_id(token, cart_name, item_id):
         f'https://api.moltin.com/v2/carts/{cart_name}/items/{item_id}',
         headers=headers,
     )
+    response.raise_for_status()
+
+    return response.json()
+
+
+def create_customer(token, email):
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        'data': {
+            'type': 'customer',
+            'name': 'name',
+            'email': email,
+            'password': 'password',
+        }
+    }
+
+    response = requests.post(
+        'https://api.moltin.com/v2/customers',
+        headers=headers,
+        data=json.dumps(data),
+    )
+
+    if response.status_code == 409:
+        raise UserExistsError
+
+    if response.status_code == 422:
+        raise InvalidEmail
+
     response.raise_for_status()
 
     return response.json()
