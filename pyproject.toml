@@ -8,7 +8,6 @@ authors = ["balancy <balancy@gmail.com>"]
 python = "^3.9"
 environs = "^9.3.5"
 requests = "^2.26.0"
-redis = "^4.0.2"
 python-telegram-bot = "^13.8.1"
 
 [tool.poetry.dev-dependencies]
