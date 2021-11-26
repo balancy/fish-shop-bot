@@ -27,4 +27,6 @@ poetry shell
 3. Rename `.env.example` to `.env` and define environment variables
 
 - `CLIENT_ID` - your [elasticpath](https://www.elasticpath.com/) client id
-- `TG_BOT_TOKEN` - your telegram bot token
+- `TG_BOT_TOKEN` - token of your telegram fish shop bot
+- `LOGS_BOT_TOKEN` - token of your telegram logs bot
+- `TG_USER_CHAT_ID` - id of your telegram user chat

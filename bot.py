@@ -1,10 +1,14 @@
+import logging
+
 from environs import Env
-from telegram.ext import Filters, Updater
+from telegram.bot import Bot
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ConversationHandler,
+    Filters,
     MessageHandler,
+    Updater,
 )
 
 from handle_API_requests import (
@@ -22,6 +26,9 @@ from handle_interfaces import (
     send_product_details_interface_to_chat,
     send_products_interface_to_chat,
 )
+from logs_handler import TelegramLogsHandler
+
+logger = logging.getLogger(__file__)
 
 
 def start(update, context):
@@ -138,15 +145,25 @@ def exit(update, context):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+    )
+
     env = Env()
     env.read_env()
 
-    tg_bot_token = env.str('TG_BOT_TOKEN')
+    bot_token = env.str('TG_BOT_TOKEN')
     moltin_client_id = env.str('CLIENT_ID')
 
-    updater = Updater(tg_bot_token, use_context=True)
+    updater = Updater(bot_token, use_context=True)
     dp = updater.dispatcher
     dp.bot_data['client_id'] = moltin_client_id
+
+    logs_bot = Bot(token=env.str('LOGS_BOT_TOKEN'))
+    logger.addHandler(
+        TelegramLogsHandler(logs_bot, env.str('TG_USER_CHAT_ID'))
+    )
 
     handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
