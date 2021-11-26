@@ -1,5 +1,13 @@
 # FISH SHOP BOT
 
+![gif](https://s10.gifyu.com/images/fish_shop_bot_.gif)
+
+App represents telegram bot with limited functionality for customers of "Fish Shop". "Fish shop" is an online shop hosted on [Elasticpath](https://www.elasticpath.com/) e-commerce platform.
+
+Bot allows to user:
+- interact with the catalog of products
+- interact with his cart (add, remove products)
+
 ## Install
 
 At least Python3.8, Git and [Poetry](https://github.com/python-poetry/poetry) should be already installed.
