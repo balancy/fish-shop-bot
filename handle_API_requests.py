@@ -8,10 +8,6 @@ class UserExistsError(HTTPError):
     pass
 
 
-class InvalidEmail(HTTPError):
-    pass
-
-
 def fetch_authorization_token(client_id):
     data = {
         'client_id': client_id,
@@ -133,9 +129,6 @@ def create_customer(token, email):
 
     if response.status_code == 409:
         raise UserExistsError
-
-    if response.status_code == 422:
-        raise InvalidEmail
 
     response.raise_for_status()
 

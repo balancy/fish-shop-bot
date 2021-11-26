@@ -15,7 +15,6 @@ from handle_API_requests import (
     fetch_products,
     fetch_product_by_id,
     remove_cart_item_by_id,
-    InvalidEmail,
     UserExistsError,
 )
 from handle_interfaces import (
@@ -118,28 +117,24 @@ def handle_cart(update, context):
 
 def wait_email(update, context):
     query = update.message.text
-    chat = update.message
     auth_token = context.bot_data['auth_token']
-
-    chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
     try:
         create_customer(token=auth_token, email=query)
-    except InvalidEmail:
-        bot_reply = f'Email {query} is incorrect.\nEnter your email:'
     except UserExistsError:
         bot_reply = f'User with email {query} exists already.'
     else:
-        bot_reply = f'User with email {query} added to the DB.'
+        bot_reply = f'User with email {query} added to the system.'
 
-    chat.reply_text(bot_reply)
+    update.message.reply_text(bot_reply)
 
     return ConversationHandler.END
 
 
-def idle(update, db):
-    print('idle')
-    return None
+def exit(update, context):
+    update.message.reply_text('User exited the conversation')
+
+    return ConversationHandler.END
 
 
 if __name__ == '__main__':
@@ -159,9 +154,11 @@ if __name__ == '__main__':
             'HANDLE_MENU': [CallbackQueryHandler(handle_menu)],
             'HANDLE_DESCRIPTION': [CallbackQueryHandler(handle_description)],
             'HANDLE_CART': [CallbackQueryHandler(handle_cart)],
-            'WAITING_EMAIL': [Filters.text, wait_email],
+            'WAITING_EMAIL': [
+                MessageHandler(Filters.regex('^\w+@\w+\.\w+$'), wait_email)
+            ],
         },
-        fallbacks=[CommandHandler('cancel', idle)],
+        fallbacks=[CommandHandler('exit', exit)],
     )
 
     dp.add_handler(handler)
