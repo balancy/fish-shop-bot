@@ -8,6 +8,8 @@ Bot allows to user:
 - interact with the catalog of products
 - interact with his cart (add, remove products)
 
+Link to telegram bot: [Bot](https://t.me/devman_fish_shop_bot)
+
 ## Install
 
 At least Python3.8, Git and [Poetry](https://github.com/python-poetry/poetry) should be already installed.
