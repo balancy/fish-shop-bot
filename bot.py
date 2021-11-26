@@ -32,6 +32,14 @@ logger = logging.getLogger(__file__)
 
 
 def start(update, context):
+    """Start handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        next bot state for user
+    """
     chat = update.message
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
@@ -46,6 +54,14 @@ def start(update, context):
 
 
 def handle_menu(update, context):
+    """Products menu handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        next bot state for user
+    """
     query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = context.bot_data['auth_token']
@@ -65,6 +81,14 @@ def handle_menu(update, context):
 
 
 def handle_description(update, context):
+    """Product description handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        next bot state for user
+    """
     query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = context.bot_data['auth_token']
@@ -96,6 +120,14 @@ def handle_description(update, context):
 
 
 def handle_cart(update, context):
+    """User cart handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        next bot state for user
+    """
     query = update.callback_query.data
     chat = update.callback_query.message
     auth_token = context.bot_data['auth_token']
@@ -123,6 +155,14 @@ def handle_cart(update, context):
 
 
 def wait_email(update, context):
+    """Waiting user email input handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        end of conversation state
+    """
     query = update.message.text
     auth_token = context.bot_data['auth_token']
 
@@ -139,6 +179,14 @@ def wait_email(update, context):
 
 
 def exit(update, context):
+    """User fallback handler
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        end of conversation state
+    """
     update.message.reply_text('User exited the conversation')
 
     return ConversationHandler.END

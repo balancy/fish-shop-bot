@@ -4,6 +4,12 @@ from handle_API_requests import fetch_image_by_id
 
 
 def send_products_interface_to_chat(products, chat):
+    """Send products list with keyboard to the chat.
+
+    Args:
+        products: products dictionary
+        chat: telegram chat instance to send products to
+    """
     keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
@@ -14,6 +20,13 @@ def send_products_interface_to_chat(products, chat):
 
 
 def send_product_details_interface_to_chat(product, chat, auth_token):
+    """Send product details with keyboard to the chat.
+
+    Args:
+        product: product details dictionary
+        chat: telegram chat instance to send product details to
+        auth_token: bearer token to request a product image
+    """
     product_image_id = product['relationships']['main_image']['data']['id']
     product_image = fetch_image_by_id(auth_token, product_image_id)['data']
     product_image_url = product_image['link']['href']
@@ -54,6 +67,14 @@ def send_product_details_interface_to_chat(product, chat, auth_token):
 
 
 def format_cart_item_for_display(cart_item):
+    """Transfrom cart item dicionary to formatted string
+
+    Args:
+        cart_item: cart item dicionary
+
+    Returns:
+        formatted string
+    """
     name = cart_item['name']
     formatted_price = cart_item['meta']['display_price']['with_tax']
     unit_price = formatted_price['unit']['formatted']
@@ -68,6 +89,12 @@ def format_cart_item_for_display(cart_item):
 
 
 def send_cart_interface_to_chat(cart, chat):
+    """Send cart items list with keyboard to chat
+
+    Args:
+        cart: cart items dictionary
+        chat: telegram chat instance to send cart items to
+    """
     bot_reply = ''.join(
         format_cart_item_for_display(cart_item) for cart_item in cart['data']
     )
