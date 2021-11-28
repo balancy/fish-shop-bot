@@ -180,6 +180,21 @@ def wait_email(update, context):
     return ConversationHandler.END
 
 
+def handle_incorrect_email(update, context):
+    """Demands user to reenter his email.
+
+    Args:
+        update and context: standard bot handler args
+
+    Returns:
+        next bot state for user
+    """
+    bot_reply = 'Reenter your email. It seems that it\'s incorrect:'
+    update.message.reply_text(bot_reply)
+
+    return 'WAITING_EMAIL'
+
+
 def exit(update, context):
     """User fallback handler
 
@@ -223,7 +238,8 @@ if __name__ == '__main__':
             'HANDLE_DESCRIPTION': [CallbackQueryHandler(handle_description)],
             'HANDLE_CART': [CallbackQueryHandler(handle_cart)],
             'WAITING_EMAIL': [
-                MessageHandler(Filters.regex('^\w+@\w+\.\w+$'), wait_email)
+                MessageHandler(Filters.regex('^\w+@\w+\.\w+$'), wait_email),
+                MessageHandler(Filters.text, handle_incorrect_email),
             ],
         },
         fallbacks=[CommandHandler('exit', exit)],
