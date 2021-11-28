@@ -8,6 +8,7 @@ from telegram.ext import (
     ConversationHandler,
     Filters,
     MessageHandler,
+    PicklePersistence,
     Updater,
 )
 
@@ -205,7 +206,8 @@ if __name__ == '__main__':
     bot_token = env.str('TG_BOT_TOKEN')
     moltin_client_id = env.str('CLIENT_ID')
 
-    updater = Updater(bot_token, use_context=True)
+    persistence = PicklePersistence(filename='conversationbot')
+    updater = Updater(bot_token, use_context=True, persistence=persistence)
     dp = updater.dispatcher
     dp.bot_data['client_id'] = moltin_client_id
 
@@ -225,6 +227,8 @@ if __name__ == '__main__':
             ],
         },
         fallbacks=[CommandHandler('exit', exit)],
+        persistent=True,
+        name='conversation_handler',
     )
 
     dp.add_handler(handler)
