@@ -3,7 +3,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from handle_API_requests import fetch_image_by_id
 
 
-def send_products_interface_to_chat(products, chat):
+def send_products(products, chat):
     """Send products list with keyboard to the chat.
 
     Args:
@@ -19,7 +19,7 @@ def send_products_interface_to_chat(products, chat):
     chat.reply_text('Catalog', reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-def send_product_details_interface_to_chat(product, chat, auth_token):
+def send_product_details(product, chat, auth_token):
     """Send product details with keyboard to the chat.
 
     Args:
@@ -88,7 +88,7 @@ def format_cart_item_for_display(cart_item):
     )
 
 
-def send_cart_interface_to_chat(cart, chat):
+def send_cart(cart, chat):
     """Send cart items list with keyboard to chat
 
     Args:

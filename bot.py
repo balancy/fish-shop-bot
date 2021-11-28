@@ -22,9 +22,9 @@ from handle_API_requests import (
     UserExistsError,
 )
 from handle_interfaces import (
-    send_cart_interface_to_chat,
-    send_product_details_interface_to_chat,
-    send_products_interface_to_chat,
+    send_cart,
+    send_product_details,
+    send_products,
 )
 from logs_handler import TelegramLogsHandler
 
@@ -48,7 +48,7 @@ def start(update, context):
     context.bot_data['auth_token'] = auth_token
 
     products = fetch_products(auth_token)
-    send_products_interface_to_chat(products, chat)
+    send_products(products, chat)
 
     return 'HANDLE_MENU'
 
@@ -70,12 +70,12 @@ def handle_menu(update, context):
 
     if query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
-        send_cart_interface_to_chat(cart, chat)
+        send_cart(cart, chat)
 
         return 'HANDLE_CART'
     else:
         product = fetch_product_by_id(auth_token, query)['data']
-        send_product_details_interface_to_chat(product, chat, auth_token)
+        send_product_details(product, chat, auth_token)
 
         return 'HANDLE_DESCRIPTION'
 
@@ -97,12 +97,12 @@ def handle_description(update, context):
 
     if query == 'Back to menu':
         products = fetch_products(auth_token)
-        send_products_interface_to_chat(products, chat)
+        send_products(products, chat)
 
         return 'HANDLE_MENU'
     elif query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
-        send_cart_interface_to_chat(cart, chat)
+        send_cart(cart, chat)
 
         return 'HANDLE_CART'
     else:
@@ -114,7 +114,7 @@ def handle_description(update, context):
             int(quantity),
         )
 
-        send_cart_interface_to_chat(cart, chat)
+        send_cart(cart, chat)
 
         return 'HANDLE_CART'
 
@@ -136,7 +136,7 @@ def handle_cart(update, context):
 
     if query == 'Back to menu':
         products = fetch_products(auth_token)
-        send_products_interface_to_chat(products, chat)
+        send_products(products, chat)
 
         return 'HANDLE_MENU'
     if query == 'Pay':
@@ -149,7 +149,7 @@ def handle_cart(update, context):
             chat.chat_id,
             query,
         )
-        send_cart_interface_to_chat(cart, chat)
+        send_cart(cart, chat)
 
         return 'HANDLE_CART'
 
