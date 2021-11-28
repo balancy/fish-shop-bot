@@ -1,3 +1,4 @@
+import time
 import logging
 
 from environs import Env
@@ -34,6 +35,31 @@ HANDLE_MENU, HANDLE_DESCRIPTION, HANDLE_CART, WAIT_EMAIL = range(4)
 logger = logging.getLogger(__file__)
 
 
+def get_actual_auth_token(context):
+    """Gets actual valid auth token. Returns current token from bot context if
+    it's not yet expired, otherwise refreshes it in the context by requesting
+    API and returns updated token.
+
+    Args:
+        context: bot context
+
+    Returns:
+        actual valid auth token
+    """
+    expires = context.bot_data['token_expires']
+
+    if expires - time.time() > 10:
+        return context.bot_data['auth_token']
+
+    client_id = context.bot_data['client_id']
+    token_details = fetch_authorization_token(client_id)
+
+    context.bot_data['token_expires'] = token_details['expires']
+    context.bot_data['auth_token'] = token_details['access_token']
+
+    return token_details['access_token']
+
+
 def start(update, context):
     """Start handler
 
@@ -46,9 +72,7 @@ def start(update, context):
     chat = update.message
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
-    client_id = context.bot_data['client_id']
-    auth_token = fetch_authorization_token(client_id)['access_token']
-    context.bot_data['auth_token'] = auth_token
+    auth_token = get_actual_auth_token(context)
 
     products = fetch_products(auth_token)
     send_products(products, chat)
@@ -67,7 +91,8 @@ def handle_menu(update, context):
     """
     query = update.callback_query.data
     chat = update.callback_query.message
-    auth_token = context.bot_data['auth_token']
+
+    auth_token = get_actual_auth_token(context)
 
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
@@ -94,7 +119,8 @@ def handle_description(update, context):
     """
     query = update.callback_query.data
     chat = update.callback_query.message
-    auth_token = context.bot_data['auth_token']
+
+    auth_token = get_actual_auth_token(context)
 
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
@@ -134,7 +160,8 @@ def handle_cart(update, context):
     """
     query = update.callback_query.data
     chat = update.callback_query.message
-    auth_token = context.bot_data['auth_token']
+
+    auth_token = get_actual_auth_token(context)
 
     chat.bot.delete_message(chat.chat_id, message_id=chat.message_id)
 
@@ -168,7 +195,8 @@ def wait_email(update, context):
         end of conversation state
     """
     query = update.message.text
-    auth_token = context.bot_data['auth_token']
+
+    auth_token = get_actual_auth_token(context)
 
     try:
         create_customer(token=auth_token, email=query)
@@ -227,6 +255,8 @@ if __name__ == '__main__':
     updater = Updater(bot_token, use_context=True, persistence=persistence)
     dp = updater.dispatcher
     dp.bot_data['client_id'] = moltin_client_id
+    dp.bot_data['auth_token'] = ''
+    dp.bot_data['token_expires'] = time.time()
 
     logs_bot = Bot(token=env.str('LOGS_BOT_TOKEN'))
     logger.addHandler(
@@ -245,7 +275,7 @@ if __name__ == '__main__':
             ],
         },
         fallbacks=[CommandHandler('exit', exit)],
-        # persistent=True,
+        persistent=True,
         name='conversation_handler',
     )
 
