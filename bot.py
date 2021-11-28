@@ -73,11 +73,11 @@ def handle_menu(update, context):
         send_cart(cart, chat)
 
         return 'HANDLE_CART'
-    else:
-        product = fetch_product_by_id(auth_token, query)['data']
-        send_product_details(product, chat, auth_token)
 
-        return 'HANDLE_DESCRIPTION'
+    product = fetch_product_by_id(auth_token, query)['data']
+    send_product_details(product, chat, auth_token)
+
+    return 'HANDLE_DESCRIPTION'
 
 
 def handle_description(update, context):
@@ -100,23 +100,24 @@ def handle_description(update, context):
         send_products(products, chat)
 
         return 'HANDLE_MENU'
+
     elif query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
         send_cart(cart, chat)
 
         return 'HANDLE_CART'
-    else:
-        product_id, quantity = query.split(';')
-        cart = add_product_to_cart(
-            auth_token,
-            chat.chat_id,
-            product_id,
-            int(quantity),
-        )
 
-        send_cart(cart, chat)
+    product_id, quantity = query.split(';')
+    cart = add_product_to_cart(
+        auth_token,
+        chat.chat_id,
+        product_id,
+        int(quantity),
+    )
 
-        return 'HANDLE_CART'
+    send_cart(cart, chat)
+
+    return 'HANDLE_CART'
 
 
 def handle_cart(update, context):
@@ -143,15 +144,15 @@ def handle_cart(update, context):
         chat.reply_text('Enter your email:')
 
         return 'WAITING_EMAIL'
-    else:
-        cart = remove_cart_item_by_id(
-            auth_token,
-            chat.chat_id,
-            query,
-        )
-        send_cart(cart, chat)
 
-        return 'HANDLE_CART'
+    cart = remove_cart_item_by_id(
+        auth_token,
+        chat.chat_id,
+        query,
+    )
+    send_cart(cart, chat)
+
+    return 'HANDLE_CART'
 
 
 def wait_email(update, context):
