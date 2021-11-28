@@ -29,6 +29,8 @@ from handle_interfaces import (
 )
 from logs_handler import TelegramLogsHandler
 
+HANDLE_MENU, HANDLE_DESCRIPTION, HANDLE_CART, WAIT_EMAIL = range(4)
+
 logger = logging.getLogger(__file__)
 
 
@@ -51,7 +53,7 @@ def start(update, context):
     products = fetch_products(auth_token)
     send_products(products, chat)
 
-    return 'HANDLE_MENU'
+    return HANDLE_MENU
 
 
 def handle_menu(update, context):
@@ -73,12 +75,12 @@ def handle_menu(update, context):
         cart = fetch_cart_items(auth_token, chat.chat_id)
         send_cart(cart, chat)
 
-        return 'HANDLE_CART'
+        return HANDLE_CART
 
     product = fetch_product_by_id(auth_token, query)['data']
     send_product_details(product, chat, auth_token)
 
-    return 'HANDLE_DESCRIPTION'
+    return HANDLE_DESCRIPTION
 
 
 def handle_description(update, context):
@@ -100,13 +102,13 @@ def handle_description(update, context):
         products = fetch_products(auth_token)
         send_products(products, chat)
 
-        return 'HANDLE_MENU'
+        return HANDLE_MENU
 
     elif query == 'Cart':
         cart = fetch_cart_items(auth_token, chat.chat_id)
         send_cart(cart, chat)
 
-        return 'HANDLE_CART'
+        return HANDLE_CART
 
     product_id, quantity = query.split(';')
     cart = add_product_to_cart(
@@ -118,7 +120,7 @@ def handle_description(update, context):
 
     send_cart(cart, chat)
 
-    return 'HANDLE_CART'
+    return HANDLE_CART
 
 
 def handle_cart(update, context):
@@ -140,11 +142,11 @@ def handle_cart(update, context):
         products = fetch_products(auth_token)
         send_products(products, chat)
 
-        return 'HANDLE_MENU'
+        return HANDLE_MENU
     if query == 'Pay':
         chat.reply_text('Enter your email:')
 
-        return 'WAITING_EMAIL'
+        return WAIT_EMAIL
 
     cart = remove_cart_item_by_id(
         auth_token,
@@ -153,7 +155,7 @@ def handle_cart(update, context):
     )
     send_cart(cart, chat)
 
-    return 'HANDLE_CART'
+    return HANDLE_CART
 
 
 def wait_email(update, context):
@@ -192,7 +194,7 @@ def handle_incorrect_email(update, context):
     bot_reply = 'Reenter your email. It seems that it\'s incorrect:'
     update.message.reply_text(bot_reply)
 
-    return 'WAITING_EMAIL'
+    return WAIT_EMAIL
 
 
 def exit(update, context):
@@ -234,16 +236,16 @@ if __name__ == '__main__':
     handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            'HANDLE_MENU': [CallbackQueryHandler(handle_menu)],
-            'HANDLE_DESCRIPTION': [CallbackQueryHandler(handle_description)],
-            'HANDLE_CART': [CallbackQueryHandler(handle_cart)],
-            'WAITING_EMAIL': [
+            HANDLE_MENU: [CallbackQueryHandler(handle_menu)],
+            HANDLE_DESCRIPTION: [CallbackQueryHandler(handle_description)],
+            HANDLE_CART: [CallbackQueryHandler(handle_cart)],
+            WAIT_EMAIL: [
                 MessageHandler(Filters.regex('^\w+@\w+\.\w+$'), wait_email),
                 MessageHandler(Filters.text, handle_incorrect_email),
             ],
         },
         fallbacks=[CommandHandler('exit', exit)],
-        persistent=True,
+        # persistent=True,
         name='conversation_handler',
     )
 

@@ -28,6 +28,8 @@ def fetch_authorization_token(client_id):
     )
     response.raise_for_status()
 
+    print(response.json())
+
     return response.json()
 
 
