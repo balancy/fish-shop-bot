@@ -1,4 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from textwrap import dedent
 
 from handle_API_requests import fetch_image_by_id
 
@@ -37,11 +38,15 @@ def send_product_details(product, chat, auth_token):
     available_product_quantity = product['meta']['stock']['level']
     product_description = product['description']
 
-    caption = (
-        f'{product_name}\n\n'
-        f'{product_price} per kg\n\n'
-        f'{available_product_quantity} kg in stock\n\n'
-        f'{product_description}'
+    caption = dedent(
+        f"""\
+        {product_name}
+
+        {product_price} per kg
+
+        {available_product_quantity} kg in stock
+
+        {product_description}"""
     )
 
     keyboard = [
@@ -81,10 +86,13 @@ def format_cart_item_for_display(cart_item):
     position_price = formatted_price['value']['formatted']
     quantity = cart_item['quantity']
 
-    return (
-        f'{name}\n'
-        f'{unit_price} per kg\n'
-        f'{quantity} kg in cart for {position_price}\n\n'
+    return dedent(
+        f"""\
+        {name}
+        {unit_price} per kg
+        {quantity} kg in cart for {position_price}
+
+        """
     )
 
 
